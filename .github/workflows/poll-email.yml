@@ -1,0 +1,17 @@
+name: Poll Emails Every 5 Minutes
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger poll-emails function
+        run: |
+          curl -X POST https://ddmytypyxaumamqrofgz.supabase.co/functions/v1/poll-emails \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
