@@ -93,24 +93,6 @@ async function getSwiggyEmailsFromLast5Mins(
   return data.messages || [];
 }
 
-async function getEmailDetails(messageId: string, gmailToken: string) {
-  const response = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${gmailToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    return null;
-  }
-
-  return await response.json();
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -125,8 +107,8 @@ Deno.serve(async (req) => {
     const { data: users, error } = await supabase
       .from("users")
       .select("*")
-      .not("gmail_refresh_token", "is", null)
-      .not("slack_token", "is", null);
+      .not("gmail_refresh_token", "is", null);
+    // .not("slack_token", "is", null);
 
     if (error) {
       console.error("Error fetching users:", error);
@@ -163,41 +145,50 @@ Deno.serve(async (req) => {
           senderEmail
         );
 
-        if (swiggyEmails.length === 0) {
+        console.log(user.firstScanDone, "user.firstScanDone");
+
+        if (user.firstScanDone === true && swiggyEmails.length === 0) {
           console.log(`No new Swiggy emails for user ${user.id}`);
           processed++;
           continue;
         }
 
-        for (const email of swiggyEmails) {
-          const emailDetail = await getEmailDetails(email.id, gmailToken);
+        // for (const email of swiggyEmails) {
+        // const emailDetail = await getEmailDetails(email.id, gmailToken);
 
-          if (emailDetail) {
-            console.log(
-              `Triggering n8n for user ${user.id} - email ${email.id}`
-            );
+        // if (emailDetail) {
+        //   console.log(
+        //     `Triggering n8n for user ${user.id} - email ${email.id}`
+        //   );
 
-            const n8nResponse = await fetch(Deno.env.get("N8N_WEBHOOK_URL"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: user.id,
-                email: user.email,
-                gmailToken: gmailToken,
-                slackToken: user.slack_token,
-                messageId: email.id,
-                emailData: emailDetail,
-              }),
-            });
+        const n8nResponse = await fetch(Deno.env.get("N8N_WEBHOOK_URL"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            email: user.email,
+            gmailToken: gmailToken,
+            slackToken: user.slack_token,
+            // messageId: email.id,
+            // emailData: emailDetail,
+          }),
+        });
 
-            if (n8nResponse.ok) {
-              triggered++;
-            } else {
-              console.error(`n8n request failed: ${n8nResponse.status}`);
-              failed++;
-            }
+        if (n8nResponse.ok) {
+          triggered++;
+          if (user.firstScanDone !== true) {
+            await supabase
+              .from("users")
+              .update({ firstScanDone: true })
+              .eq("id", user.id);
           }
+          console.log(`n8n triggered successfully for user ${user.id}`);
+        } else {
+          console.error(`n8n request failed: ${n8nResponse.status}`);
+          failed++;
         }
+        // }
+        // }
 
         processed++;
       } catch (error) {
