@@ -26,6 +26,7 @@ async function refreshGmailToken(
     const tokens = await response.json();
 
     if (tokens.access_token) {
+      // Update only Gmail-specific fields, leaving Slack tokens untouched
       await supabase
         .from("users")
         .update({
@@ -33,6 +34,7 @@ async function refreshGmailToken(
           gmail_access_token_expires_at: new Date(
             Date.now() + tokens.expires_in * 1000
           ).toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", user.id);
 
@@ -99,6 +101,32 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get environment configuration
+    const environment = Deno.env.get("ENVIRONMENT") || "production"; // "test" or "production"
+    const n8nWebhookUrl =
+      environment === "test"
+        ? Deno.env.get("N8N_TEST_WEBHOOK_URL")
+        : Deno.env.get("N8N_WEBHOOK_URL");
+
+    console.log(`Running in ${environment} mode`);
+    console.log(
+      `Using webhook: ${n8nWebhookUrl ? "configured" : "NOT CONFIGURED"}`
+    );
+
+    if (!n8nWebhookUrl) {
+      console.error(
+        `n8n webhook URL not configured for ${environment} environment`
+      );
+      return new Response(
+        JSON.stringify({
+          error: `Missing ${
+            environment === "test" ? "N8N_TEST_WEBHOOK_URL" : "N8N_WEBHOOK_URL"
+          } environment variable`,
+        }),
+        { status: 500, headers: corsHeaders }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL"),
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
@@ -161,7 +189,11 @@ Deno.serve(async (req) => {
         //     `Triggering n8n for user ${user.id} - email ${email.id}`
         //   );
 
-        const n8nResponse = await fetch(Deno.env.get("N8N_WEBHOOK_URL"), {
+        console.log(
+          `Triggering n8n webhook (${environment}) for user ${user.id}`
+        );
+
+        const n8nResponse = await fetch(n8nWebhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -169,8 +201,9 @@ Deno.serve(async (req) => {
             email: user.email,
             gmailToken: gmailToken,
             slackToken: user.slack_token,
-            // messageId: email.id,
-            // emailData: emailDetail,
+            slackUserId: user.slack_user_id,
+            environment: environment, // Pass environment to n8n workflow
+            slackChannelId: user.slack_channel_id,
           }),
         });
 
