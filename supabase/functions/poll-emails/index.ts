@@ -181,14 +181,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // for (const email of swiggyEmails) {
-        // const emailDetail = await getEmailDetails(email.id, gmailToken);
-
-        // if (emailDetail) {
-        //   console.log(
-        //     `Triggering n8n for user ${user.id} - email ${email.id}`
-        //   );
-
         console.log(
           `Triggering n8n webhook (${environment}) for user ${user.id}`
         );
@@ -204,6 +196,9 @@ Deno.serve(async (req) => {
             slackUserId: user.slack_user_id,
             environment: environment, // Pass environment to n8n workflow
             slackChannelId: user.slack_channel_id,
+            selectedPlatform: user.selected_platform,
+            discordChannelId: user.discord_channel_id,
+            discordBotToken: Deno.env.get("DISCORD_BOT_TOKEN"),
           }),
         });
 
