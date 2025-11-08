@@ -21,15 +21,18 @@ export function useOAuthFlow() {
     let processingCallback = false;
     // Check if we're returning from OAuth flow
     const handleInitialAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const url = new URL(window.location.href);
-      const isOAuthCallback = url.searchParams.has('code') || url.hash.includes('access_token');
+      const isOAuthCallback =
+        url.searchParams.has("code") || url.hash.includes("access_token");
 
       console.log("Initial auth check:", {
         hasSession: !!session,
         isOAuthCallback,
         urlParams: url.searchParams.toString(),
-        urlHash: url.hash
+        urlHash: url.hash,
       });
 
       if (session && isOAuthCallback) {
@@ -45,7 +48,7 @@ export function useOAuthFlow() {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state change:", event, {
         hasSession: !!session,
-        processing: processingCallback
+        processing: processingCallback,
       });
 
       // Handle both SIGNED_IN (new login) and USER_UPDATED (account linking)
@@ -69,7 +72,9 @@ export function useOAuthFlow() {
             processingCallback = false;
           }, 2000);
         } else {
-          console.log("No provider token - skipping (likely email/password login)");
+          console.log(
+            "No provider token - skipping (likely email/password login)"
+          );
         }
       }
     });
@@ -83,11 +88,11 @@ export function useOAuthFlow() {
       hasProviderToken: !!session.provider_token,
       hasRefreshToken: !!session.provider_refresh_token,
       appMetadataProvider: session.user.app_metadata?.provider,
-      identities: session.user.identities?.map(id => ({
+      identities: session.user.identities?.map((id) => ({
         provider: id.provider,
         id: id.id,
-        created_at: id.created_at
-      }))
+        created_at: id.created_at,
+      })),
     });
 
     const hasAccessToken = !!session.provider_token;
@@ -140,7 +145,9 @@ export function useOAuthFlow() {
         console.log("Calling handleDiscordAuthCallback");
         await handleDiscordAuthCallback(session);
       } else {
-        console.error("Discord provider detected but no discord identity found!");
+        console.error(
+          "Discord provider detected but no discord identity found!"
+        );
       }
     } else {
       console.error("Unknown provider or no provider detected");
@@ -189,7 +196,7 @@ export function useOAuthFlow() {
 
   async function handleDiscordAuthCallback(session: Session) {
     console.log("Discord auth callback started", {
-      userId: session.user.id
+      userId: session.user.id,
     });
 
     console.log("Setting Discord connection status...");
@@ -344,7 +351,10 @@ export function useOAuthFlow() {
       console.log("Response data:", JSON.stringify(responseData, null, 2));
 
       if (!response.ok) {
-        console.error("✗ Failed to set Discord connection status:", responseData);
+        console.error(
+          "✗ Failed to set Discord connection status:",
+          responseData
+        );
         return false;
       }
 
@@ -357,6 +367,7 @@ export function useOAuthFlow() {
   }
 
   async function handleGoogleAuth() {
+    console.log(REDIRECT_URL);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
