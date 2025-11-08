@@ -90,7 +90,6 @@ export function useOAuthFlow() {
       }))
     });
 
-    const hasRefreshToken = !!session.provider_refresh_token;
     const hasAccessToken = !!session.provider_token;
 
     if (!hasAccessToken) {
@@ -139,7 +138,7 @@ export function useOAuthFlow() {
       );
       if (discordIdentity) {
         console.log("Calling handleDiscordAuthCallback");
-        await handleDiscordAuthCallback(session, discordIdentity);
+        await handleDiscordAuthCallback(session);
       } else {
         console.error("Discord provider detected but no discord identity found!");
       }
@@ -188,7 +187,7 @@ export function useOAuthFlow() {
     }
   }
 
-  async function handleDiscordAuthCallback(session: Session, identity: Identity) {
+  async function handleDiscordAuthCallback(session: Session) {
     console.log("Discord auth callback started", {
       userId: session.user.id
     });
@@ -409,5 +408,6 @@ export function useOAuthFlow() {
     handleGoogleAuth,
     handleSlackAuth,
     handleDiscordAuth,
+    storeDiscordConnection: setDiscordConnectionStatus,
   };
 }

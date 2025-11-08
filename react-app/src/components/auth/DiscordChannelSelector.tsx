@@ -22,7 +22,6 @@ export function DiscordChannelSelector() {
     selectedChannelId,
     setSelectedChannelId,
     saveSelectedChannel,
-    botPresent,
     checkingBot,
     recheckBotAndSave,
   } = useDiscordChannels();
