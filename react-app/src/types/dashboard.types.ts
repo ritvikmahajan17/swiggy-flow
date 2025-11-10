@@ -2,6 +2,8 @@ export interface DashboardData {
   month: string;
   year: number;
   total_spending: number;
+  food_spending: number;
+  instamart_spending: number;
   total_orders: number;
   days_tracked: number;
   avg_order_value: number;

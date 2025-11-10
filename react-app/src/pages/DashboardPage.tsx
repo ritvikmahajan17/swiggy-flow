@@ -126,7 +126,7 @@ export function DashboardPage() {
           <OrderPatternsCard />
 
           {/* Category breakdown */}
-          <SpendingBreakdownCard />
+          <SpendingBreakdownCard data={dashboardData} />
 
           {/* Top spending insight */}
           <BiggestSplurgeCard />
