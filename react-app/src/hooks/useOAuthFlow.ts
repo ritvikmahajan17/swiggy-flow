@@ -325,16 +325,23 @@ export function useOAuthFlow() {
     }
 
     // Use linkIdentity instead of signInWithOAuth to link to existing user
-    const { error } = await supabase.auth.linkIdentity({
+    const { data, error } = await supabase.auth.linkIdentity({
       provider: "slack_oidc",
       options: {
         redirectTo: REDIRECT_URL,
+        skipBrowserRedirect: true,
       },
     });
 
     if (error) {
       console.error("Slack auth error:", error);
       alert("Failed to connect Slack. Please try again.");
+      return;
+    }
+
+    // Open OAuth URL in new tab
+    if (data?.url) {
+      window.open(data.url, '_blank');
     }
   }
 
@@ -348,17 +355,24 @@ export function useOAuthFlow() {
     }
 
     // Use linkIdentity instead of signInWithOAuth to link to existing user
-    const { error } = await supabase.auth.linkIdentity({
+    const { data, error } = await supabase.auth.linkIdentity({
       provider: "discord",
       options: {
         redirectTo: REDIRECT_URL,
-        scopes: "identify guilds guilds.members.read",
+        scopes: "guilds guilds.members.read",
+        skipBrowserRedirect: true,
       },
     });
 
     if (error) {
       console.error("Discord auth error:", error);
       alert("Failed to connect Discord. Please try again.");
+      return;
+    }
+
+    // Open OAuth URL in new tab
+    if (data?.url) {
+      window.open(data.url, '_blank');
     }
   }
 
