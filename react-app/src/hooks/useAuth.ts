@@ -15,16 +15,25 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("Auth state change event:", _event);
+      // Handle SIGNED_OUT event first - clear everything immediately
+      if (_event === "SIGNED_OUT") {
+        setUser(null);
+        clearAuth();
+        return;
+      }
+
       setUser(session?.user ?? null);
+
       if (session?.user) {
         // Check if this is a different user than the one in localStorage
         const storedUserId = localStorage.getItem(STORAGE_KEYS.USER_ID);
+
         if (storedUserId && storedUserId !== session.user.id) {
           // Different user - clear all stale data first
-          console.log("Auth state change: Different user detected, clearing stale data");
           clearAuth();
         }
+
+        // Always set the current user ID and sync
         setUserId(session.user.id);
 
         // Sync with database on auth state changes
@@ -33,7 +42,7 @@ export function useAuth() {
         if (_event === "USER_UPDATED" || _event === "SIGNED_IN") {
           if (_event === "USER_UPDATED") {
             // Wait for OAuth edge function to finish writing to database
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
           await syncWithDatabase(session.user.id);
         }
@@ -47,9 +56,24 @@ export function useAuth() {
 
   async function checkAuth() {
     try {
+      // Check if we're in an OAuth callback flow
+      const url = new URL(window.location.href);
+      const isOAuthCallback =
+        url.searchParams.has("code") || url.hash.includes("access_token");
+
+      // IMPORTANT: Get session first to check if we have a valid session
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // If no session, clear everything
+      if (!session) {
+        setUser(null);
+        clearAuth();
+        return;
+      }
+
+      const user = session.user;
 
       setUser(user);
 
@@ -57,9 +81,11 @@ export function useAuth() {
         // ALWAYS check if this is a different user than the one in localStorage
         const storedUserId = localStorage.getItem(STORAGE_KEYS.USER_ID);
 
-        if (storedUserId !== user.id) {
+        // CRITICAL: During OAuth callbacks, DON'T clear localStorage
+        // The OAuth flow (useOAuthFlow) is handling the identity linking
+        // and will sync the data properly
+        if (storedUserId !== user.id && !isOAuthCallback) {
           // Different user (or no stored user) - clear all stale data first
-          console.log("Different user detected (stored:", storedUserId, "current:", user.id, "), clearing stale data");
           clearAuth();
         }
 
@@ -67,7 +93,10 @@ export function useAuth() {
         setUserId(user.id);
 
         // Sync with database - this will set the correct connection states for this user
-        await syncWithDatabase(user.id);
+        // But skip during OAuth callback - let the OAuth flow handle it with proper timing
+        if (!isOAuthCallback) {
+          await syncWithDatabase(user.id);
+        }
       } else {
         // No user - clear everything
         clearAuth();
@@ -86,8 +115,6 @@ export function useAuth() {
       } = await supabase.auth.getSession();
       if (!session) return;
 
-      console.log("Syncing with database for user:", userId);
-
       const { data: userData, error } = await supabase
         .from("users")
         .select(
@@ -96,13 +123,10 @@ export function useAuth() {
         .eq("id", userId)
         .single();
 
-      console.log("Database response for user sync:", { userData, error });
-
       if (error) {
         if (error.code === "PGRST116") {
-          console.log("User not found in database - first time login, user row will be created by OAuth callback");
-          // Don't clear state here - OAuth callbacks might have already set connection states
-          // Just let the OAuth callbacks handle it
+          // For first time login, the OAuth callback (useOAuthFlow) will handle setting connection states
+          // We should wait and let it complete, then this will be called again
           return;
         }
         console.error("Database error:", error);
@@ -112,18 +136,14 @@ export function useAuth() {
       if (userData) {
         // Verify the userId matches to prevent data leakage
         if (userData.id !== userId) {
-          console.error("User ID mismatch! Expected:", userId, "Got:", userData.id);
+          console.error(
+            "User ID mismatch! Expected:",
+            userId,
+            "Got:",
+            userData.id
+          );
           return;
         }
-
-        console.log("User data from database:", {
-          hasGmail: !!userData.gmail_access_token,
-          hasSlack: !!userData.slack_token,
-          hasDiscord: !!userData.discord_connected,
-          selectedPlatform: userData.selected_platform,
-          slackChannelId: userData.slack_channel_id,
-          discordChannelId: userData.discord_channel_id,
-        });
 
         const {
           setGoogleConnected,
@@ -142,15 +162,6 @@ export function useAuth() {
         );
         setDiscordConnected(!!userData.discord_connected);
 
-        console.log(
-          "Connection states synced from database - Google:",
-          !!userData.gmail_access_token,
-          "Slack:",
-          !!userData.slack_token,
-          "Discord:",
-          !!userData.discord_connected
-        );
-
         // User has selected a channel if they have either slack or discord channel saved
         const hasChannelSelected =
           !!userData.slack_channel_id || !!userData.discord_channel_id;
@@ -166,7 +177,10 @@ export function useAuth() {
   }
 
   async function logout() {
+    // Sign out from Supabase FIRST (this triggers SIGNED_OUT event which clears state)
     await supabase.auth.signOut();
+
+    // Then clear local state as backup
     clearAuth();
     setUser(null);
   }

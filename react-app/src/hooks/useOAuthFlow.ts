@@ -28,15 +28,7 @@ export function useOAuthFlow() {
       const isOAuthCallback =
         url.searchParams.has("code") || url.hash.includes("access_token");
 
-      console.log("Initial auth check:", {
-        hasSession: !!session,
-        isOAuthCallback,
-        urlParams: url.searchParams.toString(),
-        urlHash: url.hash,
-      });
-
       if (session && isOAuthCallback) {
-        console.log("Processing initial OAuth callback");
         await handleAuthCallback(session);
       }
     };
@@ -46,35 +38,22 @@ export function useOAuthFlow() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, {
-        hasSession: !!session,
-        processing: processingCallback,
-      });
-
       // Handle both SIGNED_IN (new login) and USER_UPDATED (account linking)
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session) {
         // Prevent duplicate processing
         if (processingCallback) {
-          console.log("Already processing callback, skipping duplicate");
           return;
         }
-
-        console.log(`${event} event - processing auth callback`);
 
         // SIGNED_IN events with provider_token indicate OAuth login
         // Process these even if URL params are cleaned up
         if (session.provider_token) {
           processingCallback = true;
-          console.log("Provider token found, processing OAuth callback");
           await handleAuthCallback(session);
           // Reset after a delay to allow legitimate subsequent logins
           setTimeout(() => {
             processingCallback = false;
           }, 2000);
-        } else {
-          console.log(
-            "No provider token - skipping (likely email/password login)"
-          );
         }
       }
     });
@@ -83,18 +62,6 @@ export function useOAuthFlow() {
   }, []);
 
   async function handleAuthCallback(session: Session) {
-    console.log("=== OAuth Callback Started ===");
-    console.log("Session data:", {
-      hasProviderToken: !!session.provider_token,
-      hasRefreshToken: !!session.provider_refresh_token,
-      appMetadataProvider: session.user.app_metadata?.provider,
-      identities: session.user.identities?.map((id) => ({
-        provider: id.provider,
-        id: id.id,
-        created_at: id.created_at,
-      })),
-    });
-
     const hasAccessToken = !!session.provider_token;
 
     if (!hasAccessToken) {
@@ -125,9 +92,6 @@ export function useOAuthFlow() {
       }
     }
 
-    console.log("Most recent identity provider:", mostRecentIdentity?.provider);
-    console.log("Detected provider:", currentProvider);
-
     if (currentProvider === "google") {
       await handleGoogleAuthCallback(session);
     } else if (currentProvider === "slack") {
@@ -142,7 +106,6 @@ export function useOAuthFlow() {
         (id) => id.provider === "discord"
       );
       if (discordIdentity) {
-        console.log("Calling handleDiscordAuthCallback");
         await handleDiscordAuthCallback(session);
       } else {
         console.error(
@@ -169,7 +132,6 @@ export function useOAuthFlow() {
     if (success) {
       setGoogleConnected(true);
       setUserId(session.user.id);
-      console.log("Google connected successfully, set in Zustand");
     }
   }
 
@@ -192,25 +154,15 @@ export function useOAuthFlow() {
     if (success) {
       setSlackConnected(true, accessToken);
       setUserId(session.user.id);
-      console.log("Slack connected successfully, set in Zustand");
     }
   }
 
   async function handleDiscordAuthCallback(session: Session) {
-    console.log("Discord auth callback started", {
-      userId: session.user.id,
-    });
-
-    console.log("Setting Discord connection status...");
-
     const success = await setDiscordConnectionStatus(session.user.id);
-
-    console.log("Discord connection status set:", success);
 
     if (success) {
       setDiscordConnected(true);
       setUserId(session.user.id);
-      console.log("Discord connected successfully, set in Zustand");
     }
   }
 
@@ -235,10 +187,6 @@ export function useOAuthFlow() {
         refreshToken,
       };
 
-      console.log("=== Storing Google tokens ===");
-      console.log("URL:", EDGE_FUNCTIONS.SAVE_OAUTH_TOKENS);
-      console.log("Payload:", JSON.stringify(payload, null, 2));
-
       const response = await fetch(EDGE_FUNCTIONS.SAVE_OAUTH_TOKENS, {
         method: "POST",
         headers: {
@@ -248,20 +196,16 @@ export function useOAuthFlow() {
         body: JSON.stringify(payload),
       });
 
-      console.log("Response status:", response.status, response.statusText);
-
       const responseData = await response.json();
-      console.log("Response data:", JSON.stringify(responseData, null, 2));
 
       if (!response.ok) {
-        console.error("✗ Failed to store Google tokens:", responseData);
+        console.error("Failed to store Google tokens:", responseData);
         return false;
       }
 
-      console.log("✓ Google tokens stored successfully");
       return true;
     } catch (error) {
-      console.error("✗ Error storing Google tokens:", error);
+      console.error("Error storing Google tokens:", error);
       return false;
     }
   }
@@ -287,10 +231,6 @@ export function useOAuthFlow() {
         slack_user_id: slackUserId,
       };
 
-      console.log("=== Storing Slack tokens ===");
-      console.log("URL:", EDGE_FUNCTIONS.SAVE_OAUTH_TOKENS);
-      console.log("Payload:", JSON.stringify(payload, null, 2));
-
       const response = await fetch(EDGE_FUNCTIONS.SAVE_OAUTH_TOKENS, {
         method: "POST",
         headers: {
@@ -300,20 +240,16 @@ export function useOAuthFlow() {
         body: JSON.stringify(payload),
       });
 
-      console.log("Response status:", response.status, response.statusText);
-
       const responseData = await response.json();
-      console.log("Response data:", JSON.stringify(responseData, null, 2));
 
       if (!response.ok) {
-        console.error("✗ Failed to store Slack tokens:", responseData);
+        console.error("Failed to store Slack tokens:", responseData);
         return false;
       }
 
-      console.log("✓ Slack tokens stored successfully");
       return true;
     } catch (error) {
-      console.error("✗ Error storing Slack tokens:", error);
+      console.error("Error storing Slack tokens:", error);
       return false;
     }
   }
@@ -334,10 +270,6 @@ export function useOAuthFlow() {
         discord_connected: true,
       };
 
-      console.log("=== Setting Discord connection status ===");
-      console.log("URL:", EDGE_FUNCTIONS.SAVE_OAUTH_TOKENS);
-      console.log("Payload:", JSON.stringify(payload, null, 2));
-
       const response = await fetch(EDGE_FUNCTIONS.SAVE_OAUTH_TOKENS, {
         method: "POST",
         headers: {
@@ -347,29 +279,24 @@ export function useOAuthFlow() {
         body: JSON.stringify(payload),
       });
 
-      console.log("Response status:", response.status, response.statusText);
-
       const responseData = await response.json();
-      console.log("Response data:", JSON.stringify(responseData, null, 2));
 
       if (!response.ok) {
         console.error(
-          "✗ Failed to set Discord connection status:",
+          "Failed to set Discord connection status:",
           responseData
         );
         return false;
       }
 
-      console.log("✓ Discord connection status set successfully");
       return true;
     } catch (error) {
-      console.error("✗ Error setting Discord connection status:", error);
+      console.error("Error setting Discord connection status:", error);
       return false;
     }
   }
 
   async function handleGoogleAuth() {
-    console.log(REDIRECT_URL);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -389,7 +316,16 @@ export function useOAuthFlow() {
   }
 
   async function handleSlackAuth() {
-    const { error } = await supabase.auth.signInWithOAuth({
+    // Check if user is already logged in
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      alert("Please log in with Google first before connecting Slack.");
+      return;
+    }
+
+    // Use linkIdentity instead of signInWithOAuth to link to existing user
+    const { error } = await supabase.auth.linkIdentity({
       provider: "slack_oidc",
       options: {
         redirectTo: REDIRECT_URL,
@@ -403,7 +339,16 @@ export function useOAuthFlow() {
   }
 
   async function handleDiscordAuth() {
-    const { error } = await supabase.auth.signInWithOAuth({
+    // Check if user is already logged in
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      alert("Please log in with Google first before connecting Discord.");
+      return;
+    }
+
+    // Use linkIdentity instead of signInWithOAuth to link to existing user
+    const { error } = await supabase.auth.linkIdentity({
       provider: "discord",
       options: {
         redirectTo: REDIRECT_URL,

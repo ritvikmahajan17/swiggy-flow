@@ -65,8 +65,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Checking if bot is in guild: ${guildId}`);
-
     // Fetch all guilds the bot is in
     const response = await fetch("https://discord.com/api/v10/users/@me/guilds", {
       headers: {
@@ -94,8 +92,6 @@ Deno.serve(async (req) => {
 
     // Check if the bot is in the specified guild
     const botPresent = guilds.some((guild: any) => guild.id === guildId);
-
-    console.log(`Bot ${botPresent ? "IS" : "IS NOT"} present in guild ${guildId}`);
 
     return new Response(
       JSON.stringify({

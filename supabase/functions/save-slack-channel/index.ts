@@ -19,7 +19,6 @@ Deno.serve(async (req) => {
 
   try {
     const payload: SaveChannelRequest = await req.json();
-    console.log("Received payload:", payload);
     const { userId, slackChannelId } = payload;
 
     // Validate required fields
@@ -32,8 +31,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    console.log(`Saving Slack channel ${slackChannelId} for user ${userId}`);
 
     // Create Supabase client with service role key
     const supabase = createClient(
@@ -75,8 +72,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    console.log(`Successfully saved Slack channel for user ${userId}`);
 
     return new Response(
       JSON.stringify({

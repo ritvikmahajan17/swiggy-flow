@@ -13,7 +13,6 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    console.log("Received request body:", body);
 
     const { userId, discordChannelId } = body;
 

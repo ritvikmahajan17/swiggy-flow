@@ -63,8 +63,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Fetching channels for guild: ${guildId}`);
-
     // Fetch channels from Discord API for the specific guild using user's OAuth token
     const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
       headers: {

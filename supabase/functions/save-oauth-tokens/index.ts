@@ -28,7 +28,6 @@ Deno.serve(async (req) => {
 
   try {
     const payload: OAuthTokenRequest = await req.json();
-    console.log("Received payload:", payload);
     const { userId, provider } = payload;
 
     // Validate required fields
@@ -41,8 +40,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    console.log(`Saving ${provider} tokens for user ${userId}`);
 
     // Create Supabase client with service role key
     const supabase = createClient(
@@ -78,7 +75,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log("Storing Google OAuth tokens");
       updateData.gmail_access_token = accessToken;
       updateData.gmail_refresh_token = refreshToken || null;
       updateData.gmail_access_token_expires_at = new Date(
@@ -99,10 +95,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log("Storing Slack OAuth tokens", {
-        hasUserId: !!slack_user_id,
-      });
-
       updateData.slack_token = slack_token;
       updateData.slack_user_id = slack_user_id || null;
       updateData.selected_platform = "slack";
@@ -110,11 +102,6 @@ Deno.serve(async (req) => {
     // Handle Discord connection (bot-based, not OAuth)
     else if (provider === "discord") {
       const { discord_connected } = payload;
-
-      // Set discord_connected status (bot is added via invite link, not OAuth)
-      console.log("Storing Discord connection status", {
-        discordConnected: discord_connected,
-      });
 
       // Set discord_connected if explicitly provided, or default to true
       updateData.discord_connected = discord_connected !== undefined ? discord_connected : true;
@@ -130,8 +117,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    console.log(JSON.stringify(updateData, null, 2));
 
     let data, upsertError;
 
@@ -181,8 +166,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    console.log(`Successfully saved ${provider} tokens for user ${userId}`);
 
     return new Response(
       JSON.stringify({

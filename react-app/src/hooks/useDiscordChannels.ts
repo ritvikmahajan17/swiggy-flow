@@ -16,15 +16,9 @@ export function useDiscordChannels() {
   const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    console.log("Discord channels hook effect", {
-      discordConnected,
-      hasFetched: hasFetchedRef.current
-    });
-
     // Only fetch once when discord is connected
     // OAuth token will be fetched from Supabase session in the edge function
     if (discordConnected && !hasFetchedRef.current) {
-      console.log("Fetching Discord servers...");
       hasFetchedRef.current = true;
       fetchServers();
     }
@@ -51,8 +45,6 @@ export function useDiscordChannels() {
         return;
       }
 
-      console.log("Fetching Discord servers from edge function...");
-
       const response = await fetch(EDGE_FUNCTIONS.GET_DISCORD_SERVERS, {
         method: "POST",
         headers: {
@@ -63,10 +55,8 @@ export function useDiscordChannels() {
       });
 
       const data = await response.json();
-      console.log("Discord servers response:", data);
 
       if (data.servers) {
-        console.log(`Found ${data.servers.length} Discord servers`);
         setServers(data.servers);
       } else if (data.error) {
         console.error("Discord servers error:", data.error);
@@ -136,7 +126,6 @@ export function useDiscordChannels() {
       });
 
       const data = await response.json();
-      console.log("Bot presence check:", data);
 
       setBotPresent(data.botPresent || false);
       return data.botPresent || false;
@@ -156,7 +145,6 @@ export function useDiscordChannels() {
     const isBotPresent = await checkBotPresence(selectedServerId);
 
     if (!isBotPresent) {
-      console.log("Bot not present in server, user needs to add bot first");
       // Don't save the channel yet, show invite modal instead
       return false;
     }
@@ -174,7 +162,6 @@ export function useDiscordChannels() {
         userId,
         discordChannelId: selectedChannelId,
       };
-      console.log("Sending save channel request:", requestBody);
 
       const response = await fetch(EDGE_FUNCTIONS.SAVE_DISCORD_CHANNEL, {
         method: "POST",
@@ -186,7 +173,6 @@ export function useDiscordChannels() {
       });
 
       const responseData = await response.json();
-      console.log("Save channel response:", responseData);
 
       if (response.ok) {
         setChannelSelected(true);
@@ -208,7 +194,6 @@ export function useDiscordChannels() {
     const isBotPresent = await checkBotPresence(selectedServerId);
 
     if (!isBotPresent) {
-      console.log("Bot still not present in server");
       return false;
     }
 
@@ -226,7 +211,6 @@ export function useDiscordChannels() {
         userId,
         discordChannelId: selectedChannelId,
       };
-      console.log("Sending recheck save channel request:", requestBody);
 
       const response = await fetch(EDGE_FUNCTIONS.SAVE_DISCORD_CHANNEL, {
         method: "POST",
@@ -238,7 +222,6 @@ export function useDiscordChannels() {
       });
 
       const responseData = await response.json();
-      console.log("Recheck save channel response:", responseData);
 
       if (response.ok) {
         setChannelSelected(true);

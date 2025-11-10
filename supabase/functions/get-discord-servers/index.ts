@@ -51,8 +51,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("Fetching Discord servers (guilds) that the USER is in...");
-
     // Fetch guilds (servers) that the USER is in from Discord API using their OAuth token
     const response = await fetch("https://discord.com/api/v10/users/@me/guilds", {
       headers: {

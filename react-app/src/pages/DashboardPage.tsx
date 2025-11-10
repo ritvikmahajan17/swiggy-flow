@@ -20,6 +20,7 @@ export function DashboardPage() {
     null
   );
   const hasFetchedData = useRef(false);
+  const lastFetchedUserId = useRef<string | null>(null);
 
   useEffect(() => {
     // Only redirect if we're done loading and still no user
@@ -31,13 +32,33 @@ export function DashboardPage() {
   useEffect(() => {
     // Make API call when dashboard loads
     const fetchDashboardData = async () => {
-      if (!user || !selectedPlatform) return;
+      if (!user || !selectedPlatform) {
+        return;
+      }
 
-      // Prevent multiple calls
-      if (hasFetchedData.current) return;
+      // Prevent multiple calls for the SAME user
+      // But allow fetching for different users
+      if (hasFetchedData.current && lastFetchedUserId.current === user.id) {
+        return;
+      }
+
+      // If this is a different user, reset the fetch flag
+      if (lastFetchedUserId.current !== user.id) {
+        hasFetchedData.current = false;
+        setDashboardData(null);
+      }
+
       hasFetchedData.current = true;
+      lastFetchedUserId.current = user.id;
 
       setDashboardLoading(true);
+
+      const payload = {
+        userId: user.id,
+        email: user.email,
+        platform: selectedPlatform,
+      };
+
       try {
         const response = await fetch(
           "https://n8n-ritvik.onrender.com/webhook/dashboard",
@@ -46,11 +67,7 @@ export function DashboardPage() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              userId: user.id,
-              email: user.email,
-              platform: selectedPlatform,
-            }),
+            body: JSON.stringify(payload),
           }
         );
 
@@ -59,7 +76,6 @@ export function DashboardPage() {
         }
 
         const data = await response.json();
-        console.log("Dashboard data received:", data);
 
         // API returns an array with a single object
         if (Array.isArray(data) && data.length > 0) {
