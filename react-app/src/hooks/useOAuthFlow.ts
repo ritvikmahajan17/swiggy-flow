@@ -169,6 +169,7 @@ export function useOAuthFlow() {
     if (success) {
       setGoogleConnected(true);
       setUserId(session.user.id);
+      console.log("Google connected successfully, set in Zustand");
     }
   }
 
@@ -191,6 +192,7 @@ export function useOAuthFlow() {
     if (success) {
       setSlackConnected(true, accessToken);
       setUserId(session.user.id);
+      console.log("Slack connected successfully, set in Zustand");
     }
   }
 
@@ -208,7 +210,7 @@ export function useOAuthFlow() {
     if (success) {
       setDiscordConnected(true);
       setUserId(session.user.id);
-      console.log("Discord connected state updated");
+      console.log("Discord connected successfully, set in Zustand");
     }
   }
 

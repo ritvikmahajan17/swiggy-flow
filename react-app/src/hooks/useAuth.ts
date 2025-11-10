@@ -14,7 +14,8 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log("Auth state change event:", _event);
       setUser(session?.user ?? null);
       if (session?.user) {
         // Check if this is a different user than the one in localStorage
@@ -25,6 +26,19 @@ export function useAuth() {
           clearAuth();
         }
         setUserId(session.user.id);
+
+        // Sync with database on auth state changes
+        // This ensures we get fresh data after OAuth callbacks complete
+        // Add a delay for USER_UPDATED to allow OAuth edge functions to complete
+        if (_event === "USER_UPDATED" || _event === "SIGNED_IN") {
+          if (_event === "USER_UPDATED") {
+            // Wait for OAuth edge function to finish writing to database
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          await syncWithDatabase(session.user.id);
+        }
+      } else {
+        clearAuth();
       }
     });
 
@@ -40,17 +54,22 @@ export function useAuth() {
       setUser(user);
 
       if (user) {
-        // Check if this is a different user than the one in localStorage
+        // ALWAYS check if this is a different user than the one in localStorage
         const storedUserId = localStorage.getItem(STORAGE_KEYS.USER_ID);
-        if (storedUserId && storedUserId !== user.id) {
-          // Different user - clear all stale data first
-          console.log("Different user detected, clearing stale data");
+
+        if (storedUserId !== user.id) {
+          // Different user (or no stored user) - clear all stale data first
+          console.log("Different user detected (stored:", storedUserId, "current:", user.id, "), clearing stale data");
           clearAuth();
         }
 
+        // Set the current user ID
         setUserId(user.id);
+
+        // Sync with database - this will set the correct connection states for this user
         await syncWithDatabase(user.id);
       } else {
+        // No user - clear everything
         clearAuth();
       }
     } catch (error) {
@@ -72,7 +91,7 @@ export function useAuth() {
       const { data: userData, error } = await supabase
         .from("users")
         .select(
-          "gmail_access_token, slack_token, discord_connected, slack_channel_id, discord_channel_id, selected_platform"
+          "id, gmail_access_token, slack_token, discord_connected, slack_channel_id, discord_channel_id, selected_platform"
         )
         .eq("id", userId)
         .single();
@@ -81,7 +100,9 @@ export function useAuth() {
 
       if (error) {
         if (error.code === "PGRST116") {
-          console.log("User not found in database - first time login");
+          console.log("User not found in database - first time login, user row will be created by OAuth callback");
+          // Don't clear state here - OAuth callbacks might have already set connection states
+          // Just let the OAuth callbacks handle it
           return;
         }
         console.error("Database error:", error);
@@ -89,11 +110,19 @@ export function useAuth() {
       }
 
       if (userData) {
+        // Verify the userId matches to prevent data leakage
+        if (userData.id !== userId) {
+          console.error("User ID mismatch! Expected:", userId, "Got:", userData.id);
+          return;
+        }
+
         console.log("User data from database:", {
           hasGmail: !!userData.gmail_access_token,
           hasSlack: !!userData.slack_token,
           hasDiscord: !!userData.discord_connected,
           selectedPlatform: userData.selected_platform,
+          slackChannelId: userData.slack_channel_id,
+          discordChannelId: userData.discord_channel_id,
         });
 
         const {
@@ -104,6 +133,8 @@ export function useAuth() {
           setSelectedPlatform,
         } = useAuthStore.getState();
 
+        // Set connection states based on database ONLY
+        // The database is the source of truth
         setGoogleConnected(!!userData.gmail_access_token);
         setSlackConnected(
           !!userData.slack_token,
@@ -112,7 +143,11 @@ export function useAuth() {
         setDiscordConnected(!!userData.discord_connected);
 
         console.log(
-          "Discord connected state set to:",
+          "Connection states synced from database - Google:",
+          !!userData.gmail_access_token,
+          "Slack:",
+          !!userData.slack_token,
+          "Discord:",
           !!userData.discord_connected
         );
 
