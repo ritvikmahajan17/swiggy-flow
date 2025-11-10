@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/authStore";
+import { STORAGE_KEYS } from "@/lib/constants";
 import type { User } from "@supabase/supabase-js";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const { setUserId, loadFromLocalStorage, clearAuth } = useAuthStore();
+  const { setUserId, clearAuth } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
@@ -16,12 +17,19 @@ export function useAuth() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
+        // Check if this is a different user than the one in localStorage
+        const storedUserId = localStorage.getItem(STORAGE_KEYS.USER_ID);
+        if (storedUserId && storedUserId !== session.user.id) {
+          // Different user - clear all stale data first
+          console.log("Auth state change: Different user detected, clearing stale data");
+          clearAuth();
+        }
         setUserId(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [setUserId]);
+  }, [setUserId, clearAuth]);
 
   async function checkAuth() {
     try {
@@ -32,8 +40,15 @@ export function useAuth() {
       setUser(user);
 
       if (user) {
+        // Check if this is a different user than the one in localStorage
+        const storedUserId = localStorage.getItem(STORAGE_KEYS.USER_ID);
+        if (storedUserId && storedUserId !== user.id) {
+          // Different user - clear all stale data first
+          console.log("Different user detected, clearing stale data");
+          clearAuth();
+        }
+
         setUserId(user.id);
-        loadFromLocalStorage();
         await syncWithDatabase(user.id);
       } else {
         clearAuth();
@@ -47,16 +62,22 @@ export function useAuth() {
 
   async function syncWithDatabase(userId: string) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) return;
 
       console.log("Syncing with database for user:", userId);
 
       const { data: userData, error } = await supabase
         .from("users")
-        .select("gmail_access_token, slack_token, discord_connected, slack_channel_id, discord_channel_id, selected_platform")
+        .select(
+          "gmail_access_token, slack_token, discord_connected, slack_channel_id, discord_channel_id, selected_platform"
+        )
         .eq("id", userId)
         .single();
+
+      console.log("Database response for user sync:", { userData, error });
 
       if (error) {
         if (error.code === "PGRST116") {
@@ -72,7 +93,7 @@ export function useAuth() {
           hasGmail: !!userData.gmail_access_token,
           hasSlack: !!userData.slack_token,
           hasDiscord: !!userData.discord_connected,
-          selectedPlatform: userData.selected_platform
+          selectedPlatform: userData.selected_platform,
         });
 
         const {
@@ -84,13 +105,20 @@ export function useAuth() {
         } = useAuthStore.getState();
 
         setGoogleConnected(!!userData.gmail_access_token);
-        setSlackConnected(!!userData.slack_token, userData.slack_token || undefined);
+        setSlackConnected(
+          !!userData.slack_token,
+          userData.slack_token || undefined
+        );
         setDiscordConnected(!!userData.discord_connected);
 
-        console.log("Discord connected state set to:", !!userData.discord_connected);
+        console.log(
+          "Discord connected state set to:",
+          !!userData.discord_connected
+        );
 
         // User has selected a channel if they have either slack or discord channel saved
-        const hasChannelSelected = !!userData.slack_channel_id || !!userData.discord_channel_id;
+        const hasChannelSelected =
+          !!userData.slack_channel_id || !!userData.discord_channel_id;
         setChannelSelected(hasChannelSelected);
 
         if (userData.selected_platform) {
